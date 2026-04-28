@@ -100,6 +100,14 @@ function RequestCard({ req, tracking, selected, onClick, dimmed, idx = 0 }) {
           )}
         </div>
       )}
+
+      {req.status === 'awaiting-approval' && (
+        <div style={styles.awaitingBadge}>
+          <span style={styles.awaitingDot} />
+          ⏳ AWAITING NGO APPROVAL
+          {req.assigned?.[0] && <span style={{color: '#9aa0b8', marginLeft: 6}}>→ {req.assigned[0].name}</span>}
+        </div>
+      )}
     </div>
   );
 }
@@ -134,4 +142,6 @@ const styles = {
   trackerFill: { height: '100%', borderRadius: 4, background: 'linear-gradient(90deg, #00e676, #69f0ae)', transition: 'width 0.5s linear' },
   trackerDot: { position: 'absolute', top: -3, width: 10, height: 10, background: '#fff', border: '2px solid #00e676', borderRadius: '50%', transition: 'left 0.5s linear', boxShadow: '0 0 8px rgba(0,230,118,.6)' },
   trackerDest: { fontSize: 9, color: '#9aa0b8', textAlign: 'right', fontFamily: 'var(--font-mono)' },
+  awaitingBadge: { marginTop: 8, padding: '6px 10px', borderRadius: 6, background: 'rgba(255,140,0,.08)', border: '1px solid rgba(255,140,0,.2)', color: '#ff8c00', fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 600, letterSpacing: 0.5, display: 'flex', alignItems: 'center', gap: 6, animation: 'pulse 2s ease-in-out infinite' },
+  awaitingDot: { width: 6, height: 6, borderRadius: '50%', background: '#ff8c00', flexShrink: 0, animation: 'pulse 1.5s ease-in-out infinite' },
 };

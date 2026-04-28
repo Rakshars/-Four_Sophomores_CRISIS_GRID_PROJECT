@@ -1,3 +1,12 @@
+// ──────────────────────────────────────────────────────────────────────────────
+// NOTE ON GEOCODING:
+// To enable highly accurate location resolution using the Google Maps API,
+// you must provide a valid API key via the GOOGLE_MAPS_API_KEY environment
+// variable. If this is not provided, the system will fall back to using
+// randomized mock coordinates.
+// Example: GOOGLE_MAPS_API_KEY=your_api_key node index.js
+// ──────────────────────────────────────────────────────────────────────────────
+
 const express  = require('express');
 const cors     = require('cors');
 const { v4: uuidv4 } = require('uuid');
@@ -22,6 +31,7 @@ let ngos     = JSON.parse(JSON.stringify(NGO_SEED));
 let commsLog = [];
 let sseClients = [];
 let smsLog   = []; // Track SMS events
+let reqCounter = 0; // Monotonic counter for unique request IDs
 
 // ── SSE Broadcast ────────────────────────────────────────────────────────────
 function broadcast(event, data) {
@@ -68,27 +78,38 @@ async function geocode(locStr) {
     if (lower.includes(k)) return v;
   }
 
-  // 3. Fallback to OpenStreetMap Nominatim (Free alternative to Google Maps API)
+  // 3. Google Maps Geocoding API
   return new Promise((resolve) => {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(locStr)}&format=json&limit=1`;
-    const options = { headers: { 'User-Agent': 'CrisisGridApp/1.0' } };
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     
-    https.get(url, options, (res) => {
+    // If no API key is provided, fallback to random mock coordinates
+    if (!apiKey) {
+      console.warn('⚠️ No GOOGLE_MAPS_API_KEY provided. Using random fallback coordinates.');
+      return resolve([12.90 + Math.random() * 0.15, 77.55 + Math.random() * 0.20]);
+    }
+
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(locStr)}&key=${apiKey}`;
+    
+    https.get(url, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         try {
           const parsed = JSON.parse(data);
-          if (parsed && parsed.length > 0) {
-            resolve([parseFloat(parsed[0].lat), parseFloat(parsed[0].lon)]);
+          if (parsed.status === 'OK' && parsed.results && parsed.results.length > 0) {
+            const loc = parsed.results[0].geometry.location;
+            resolve([loc.lat, loc.lng]);
           } else {
+            console.warn('⚠️ Google Maps API failed or returned zero results. Status:', parsed.status);
             resolve([12.90 + Math.random() * 0.15, 77.55 + Math.random() * 0.20]);
           }
         } catch (e) {
+          console.error('Error parsing Google Maps response:', e);
           resolve([12.90 + Math.random() * 0.15, 77.55 + Math.random() * 0.20]);
         }
       });
-    }).on('error', () => {
+    }).on('error', (err) => {
+      console.error('Error contacting Google Maps API:', err.message);
       resolve([12.90 + Math.random() * 0.15, 77.55 + Math.random() * 0.20]);
     });
   });
@@ -249,7 +270,7 @@ async function processSOSRequest({ loc, type, people, description, source = 'for
   const nearby           = findNearby(lat, lng, requests, 2.0);
 
   const request = {
-    id:          `REQ-${String(requests.length + 1).padStart(4, '0')}`,
+    id:          `REQ-${String(++reqCounter).padStart(4, '0')}`,
     loc, type,
     people:      parseInt(people, 10),
     description: description || '',
@@ -624,6 +645,7 @@ app.post('/api/reset', (_req, res) => {
   ngos     = JSON.parse(JSON.stringify(NGO_SEED));
   commsLog = [];
   smsLog   = [];
+  reqCounter = 0;
   broadcast('init', { requests, ngos, commsLog, smsLog });
   res.json({ ok: true });
 });
@@ -634,6 +656,7 @@ app.post('/api/reset/all', (_req, res) => {
   ngos     = [];
   commsLog = [];
   smsLog   = [];
+  reqCounter = 0;
   broadcast('init', { requests, ngos, commsLog, smsLog });
   res.json({ ok: true });
 });

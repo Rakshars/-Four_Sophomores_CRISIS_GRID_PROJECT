@@ -61,6 +61,10 @@ export default function NGODashboard() {
     r.status === 'in-progress' && r.assigned.some(a => a.id === ngoInfo.id)
   );
 
+  const completedRequests = requests.filter(r =>
+    r.status === 'completed' && r.assigned.some(a => a.id === ngoInfo.id)
+  );
+
   const myComms = commsLog.filter(c => c.message.includes(ngoInfo.name) || c.message.includes("General"));
 
   const available = ngoInfo.capacity - ngoInfo.used;
@@ -147,7 +151,7 @@ export default function NGODashboard() {
                   borderLeftColor: c.type === 'error' ? '#ff4545' : ngoInfo.color
                 }}>
                   <div style={{color: '#6b7394', fontSize: 10, marginBottom: 4}}>
-                    {new Date(c.timestamp).toLocaleTimeString()}
+                    {new Date(c.ts).toLocaleTimeString()}
                   </div>
                   <div style={{color: '#e8eaf0', fontSize: 12}}>{c.message}</div>
                 </div>
@@ -238,9 +242,42 @@ export default function NGODashboard() {
                           <div style={styles.reqLoc}>📍 {r.loc}</div>
                           <div style={styles.reqDesc}>{r.description}</div>
                           <div style={styles.reqFooter}>
-                            <span style={{color: '#00e676'}}>Deploying {assigned.assignedCount} units</span>
+                            <span style={{color: '#00e676'}}>Deploying {assigned?.assignedCount ?? r.people} units</span>
                             <span>•</span>
-                            <span>ETA: {r.eta}m</span>
+                            <span>ETA: {r.eta ?? '—'}m</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* COMPLETED MISSIONS */}
+            <div style={styles.card}>
+              <div style={styles.cardTitle}>COMPLETED MISSIONS ({completedRequests.length})</div>
+              {completedRequests.length === 0 ? (
+                <div style={styles.emptyBox}>
+                  <div style={{fontSize: 40, marginBottom: 10, filter: 'grayscale(1)', opacity: 0.5}}>✅</div>
+                  No completed missions yet.
+                </div>
+              ) : (
+                <div style={{...styles.reqList, maxHeight: 200}}>
+                  {completedRequests.map(r => {
+                    const assigned = r.assigned.find(a => a.id === ngoInfo.id);
+                    return (
+                      <div key={r.id} style={{...styles.reqItem, background: 'linear-gradient(90deg, rgba(0, 230, 118, 0.08), transparent)'}}>
+                        <div style={styles.reqItemInner}>
+                          <div style={styles.reqHeader}>
+                            <span style={{background: 'rgba(0,230,118,0.1)', color: '#00e676', padding: '2px 6px', borderRadius: 4, fontWeight: 'bold'}}>COMPLETED</span>
+                            <span style={{color: '#6b7394'}}>{r.id}</span>
+                          </div>
+                          <div style={styles.reqLoc}>📍 {r.loc}</div>
+                          <div style={styles.reqFooter}>
+                            <span style={{color: '#00e676'}}>Helped {assigned?.assignedCount ?? r.people} people</span>
+                            <span>•</span>
+                            <span>{r.completedAt ? new Date(r.completedAt).toLocaleTimeString() : '—'}</span>
                           </div>
                         </div>
                       </div>

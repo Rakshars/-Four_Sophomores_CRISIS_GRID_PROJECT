@@ -18,6 +18,7 @@ export const TYPE_ICONS = {
 
 export const STATUS_COLORS = {
   pending:     '#7a8099',
+  'awaiting-approval': '#ff8c00',
   assigned:    '#4fc3f7',
   'in-progress': '#00e676',
   completed:   '#444',

@@ -35,12 +35,22 @@ export default function StatsBar({ requests, ngos }) {
   const usedCap = ngos.reduce((s, n) => s + n.used, 0);
   const capPct = totalCap > 0 ? Math.round((usedCap / totalCap) * 100) : 0;
 
+  let avgResponseMin = 0;
+  if (completed.length > 0) {
+    const totalMs = completed.reduce((s, r) => {
+      if (!r.completedAt) return s;
+      return s + (new Date(r.completedAt).getTime() - new Date(r.ts).getTime());
+    }, 0);
+    avgResponseMin = Math.round(totalMs / completed.length / 60000);
+  }
+
   const stats = [
     { label: 'TOTAL REQUESTS', value: requests.length, icon: '📊', color: '#4fc3f7' },
     { label: 'PEOPLE AFFECTED', value: totalPeople, icon: '👥', color: '#ff8c00' },
     { label: 'PEOPLE HELPED', value: helpedPeople, icon: '✅', color: '#00e676' },
     { label: 'CRITICAL', value: criticalCount, icon: '🔴', color: criticalCount > 0 ? '#ff3030' : '#6b7394' },
     { label: 'HOTSPOTS', value: hotspots, icon: '🔥', color: hotspots > 0 ? '#ff8c00' : '#6b7394' },
+    { label: 'AVG RESPONSE', value: avgResponseMin, icon: '⏱️', color: avgResponseMin > 0 ? '#4fc3f7' : '#6b7394', suffix: 'm' },
     { label: 'NGO CAPACITY', value: capPct, icon: '⬡', color: capPct > 70 ? '#ff3030' : capPct > 40 ? '#ff8c00' : '#00e676', suffix: '%' },
   ];
 

@@ -44,6 +44,20 @@ export function useDisasterStore() {
       es.addEventListener('newRequest', e => {
         const r = JSON.parse(e.data);
         setRequests(prev => [r, ...prev.filter(x => x.id !== r.id)]);
+        // Play alert beep for new SOS
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = r.priority === 'CRITICAL' ? 880 : 660;
+          osc.type = 'sine';
+          gain.gain.setValueAtTime(0.3, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.3);
+        } catch (e) { /* audio not available */ }
       });
 
       es.addEventListener('requestUpdate', e => {
