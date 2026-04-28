@@ -36,13 +36,17 @@ export default function NGODashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ addCapacity: addStock })
       });
+      const data = await res.json();
       if (res.ok) {
         setStatusMsg(`Successfully added ${addStock} to capacity.`);
         setAddStock(0);
         setTimeout(() => setStatusMsg(''), 3000);
+      } else {
+        setStatusMsg(data.message || 'Failed to update stock.');
+        setTimeout(() => setStatusMsg(''), 5000);
       }
     } catch (e) {
-      setStatusMsg('Failed to update stock.');
+      setStatusMsg('Connection error. Failed to update stock.');
     }
   };
 
@@ -85,6 +89,14 @@ export default function NGODashboard() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {available <= 0 && (
+            <div style={{
+              background: 'rgba(255, 69, 69, 0.15)', border: '1px solid #ff4545', color: '#ff4545',
+              padding: '6px 12px', borderRadius: 8, fontSize: 10, fontWeight: 'bold', animation: 'pulse 2s infinite'
+            }}>
+              🚨 RESTOCK REQUIRED
+            </div>
+          )}
           <button 
             onClick={toggleTheme}
             style={{
@@ -104,19 +116,37 @@ export default function NGODashboard() {
       <div style={styles.content}>
         <div style={styles.leftCol}>
           <div style={styles.card}>
-            <div style={styles.cardTitle}>RESOURCE STOCK</div>
+            <div style={{...styles.cardTitle, display: 'flex', justifyContent: 'space-between'}}>
+              <span>RESOURCE STOCK</span>
+              <span style={{color: available <= 0 ? '#ff4545' : '#00e676'}}>
+                {Math.round((available / ngoInfo.capacity) * 100)}% READY
+              </span>
+            </div>
+            
+            <div style={{
+              width: '100%', height: 8, background: 'rgba(255,255,255,0.05)', 
+              borderRadius: 4, margin: '10px 0 20px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)'
+            }}>
+              <div style={{
+                width: `${(available / ngoInfo.capacity) * 100}%`, height: '100%',
+                background: available <= (ngoInfo.capacity * 0.2) ? '#ff4545' : '#00e676',
+                boxShadow: `0 0 10px ${available <= (ngoInfo.capacity * 0.2) ? '#ff4545' : '#00e676'}`,
+                transition: 'width 0.5s ease'
+              }} />
+            </div>
+
             <div style={styles.stats}>
               <div style={styles.statBox}>
                 <div style={styles.statVal}>{ngoInfo.capacity}</div>
-                <div style={styles.statLabel}>TOTAL CAPACITY</div>
+                <div style={styles.statLabel}>TOTAL</div>
               </div>
               <div style={styles.statBox}>
                 <div style={styles.statVal}>{ngoInfo.used}</div>
-                <div style={styles.statLabel}>CURRENTLY DEPLOYED</div>
+                <div style={styles.statLabel}>USED</div>
               </div>
-              <div style={{...styles.statBox, background: 'rgba(0, 230, 118, 0.05)', borderColor: 'rgba(0, 230, 118, 0.2)'}}>
-                <div style={{...styles.statVal, color: '#00e676'}}>{available}</div>
-                <div style={styles.statLabel}>AVAILABLE</div>
+              <div style={{...styles.statBox, background: available <= 0 ? 'rgba(255, 69, 69, 0.05)' : 'rgba(0, 230, 118, 0.05)', borderColor: available <= 0 ? 'rgba(255, 69, 69, 0.2)' : 'rgba(0, 230, 118, 0.2)'}}>
+                <div style={{...styles.statVal, color: available <= 0 ? '#ff4545' : '#00e676'}}>{available}</div>
+                <div style={styles.statLabel}>FREE</div>
               </div>
             </div>
           </div>
@@ -187,6 +217,7 @@ export default function NGODashboard() {
                           
                           <div style={{ marginTop: 15, display: 'flex', gap: 10, alignItems: 'center' }}>
                             <button 
+                              disabled={available < (assigned?.assignedCount || r.people)}
                               onClick={async () => {
                                 const val = window.prompt("Please enter ETA (in minutes):");
                                 if (!val) return; // User cancelled or entered empty
@@ -197,9 +228,16 @@ export default function NGODashboard() {
                                   alert("Failed to accept: " + err.message);
                                 }
                               }}
-                              style={{ flex: 1, padding: '8px 0', background: '#00e676', color: '#000', border: 'none', borderRadius: 6, fontWeight: 'bold', cursor: 'pointer' }}
+                              style={{ 
+                                flex: 1, padding: '8px 0', 
+                                background: available < (assigned?.assignedCount || r.people) ? '#333' : '#00e676', 
+                                color: available < (assigned?.assignedCount || r.people) ? '#666' : '#000', 
+                                border: 'none', borderRadius: 6, fontWeight: 'bold', 
+                                cursor: available < (assigned?.assignedCount || r.people) ? 'not-allowed' : 'pointer',
+                                opacity: available < (assigned?.assignedCount || r.people) ? 0.5 : 1
+                              }}
                             >
-                              ACCEPT
+                              {available < (assigned?.assignedCount || r.people) ? 'LOW CAPACITY' : 'ACCEPT'}
                             </button>
                             <button 
                               onClick={() => forwardRequest(r.id, ngoInfo.id)}

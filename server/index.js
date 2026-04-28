@@ -151,22 +151,28 @@ async function geocode(locStr) {
     if (lower.includes(k)) return v;
   }
 
+  // Add region context to help geocoder focus on India/local area if not specified
+  let searchStr = locStr;
+  if (!/india/i.test(locStr)) {
+    searchStr += ", Karnataka, India";
+  }
+
   // 3. Try Google Maps API if key is available
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (apiKey) {
     try {
-      return await geocodeGoogle(locStr, apiKey);
+      return await geocodeGoogle(searchStr, apiKey);
     } catch (e) {
-      console.warn(`⚠️ Google Maps failed for "${locStr}": ${e.message}. Trying Nominatim...`);
+      console.warn(`⚠️ Google Maps failed for "${searchStr}": ${e.message}. Trying Nominatim...`);
     }
   }
 
   // 4. Fallback to OpenStreetMap Nominatim (free, no key required)
   try {
-    return await geocodeNominatim(locStr);
+    return await geocodeNominatim(searchStr);
   } catch (e) {
-    console.warn(`⚠️ Nominatim also failed for "${locStr}": ${e.message}. Using Bengaluru center.`);
-    return [12.9716, 77.5946]; // Default to Bengaluru center instead of random
+    console.warn(`⚠️ Nominatim also failed for "${searchStr}": ${e.message}. Using Bengaluru center.`);
+    return [12.9716, 77.5946]; // Default to Bengaluru center
   }
 }
 
@@ -566,23 +572,40 @@ app.patch('/api/ngos/:id/stock', (req, res) => {
   const ngo = ngos.find(n => n.id === req.params.id);
   if (!ngo) return res.status(404).json({ success: false, message: 'NGO not found' });
   const { addCapacity } = req.body;
-  if (addCapacity) ngo.capacity += parseInt(addCapacity, 10);
+  const amount = parseInt(addCapacity, 10);
+  
+  if (ngo.capacity + amount > 5000) {
+    return res.status(400).json({ success: false, message: 'Maximum capacity exceeded. NGO cannot manage more than 5000 units.' });
+  }
+
+  ngo.capacity += amount;
   broadcast('ngoUpdate', ngos);
-  addComms('system', `📦 NGO ${ngo.name} restocked capacity (+${addCapacity})`);
+  addComms('system', `📦 NGO ${ngo.name} restocked capacity (+${amount})`);
   res.json({ success: true, ngo });
 });
 
 // POST add single NGO
-app.post('/api/ngos', (req, res) => {
-  const { name, lat, lng, capacity, resources, phone, specialization, color } = req.body;
+app.post('/api/ngos', async (req, res) => {
+  const { name, lat, lng, location, capacity, resources, phone, specialization, color } = req.body;
   if (!name || !capacity || !resources) return res.status(400).json({ error: 'Missing required fields: name, capacity, resources' });
+
+  let finalLat = parseFloat(lat);
+  let finalLng = parseFloat(lng);
+  if (location && (!finalLat || !finalLng)) {
+    const coords = await geocode(location);
+    finalLat = coords[0];
+    finalLng = coords[1];
+  } else if (!finalLat || !finalLng) {
+    finalLat = 12.9716;
+    finalLng = 77.5946;
+  }
 
   const id = `N${Date.now()}`;
   const ngo = {
     id,
     name,
-    lat:            parseFloat(lat) || 12.9716,
-    lng:            parseFloat(lng) || 77.5946,
+    lat: finalLat,
+    lng: finalLng,
     capacity:       parseInt(capacity, 10),
     used:           0,
     resources:      Array.isArray(resources) ? resources : resources.split(',').map(r => r.trim()),
@@ -594,25 +617,37 @@ app.post('/api/ngos', (req, res) => {
 
   ngos.push(ngo);
   broadcast('ngoUpdate', ngos);
-  addComms('system', `➕ New NGO registered: ${name} (cap: ${capacity}, resources: ${ngo.resources.join(', ')})`);
+  addComms('system', `➕ New NGO registered: ${name} (cap: ${capacity}, resources: ${ngo.resources.join(', ')}, location: ${location || `${finalLat},${finalLng}`})`);
   res.json(ngo);
 });
 
 // POST bulk insert NGOs (array)
-app.post('/api/ngos/bulk', (req, res) => {
-  const list = req.body; // array of NGO objects
+app.post('/api/ngos/bulk', async (req, res) => {
+  const list = req.body;
   if (!Array.isArray(list) || !list.length) return res.status(400).json({ error: 'Send an array of NGO objects' });
 
   const added = [];
   for (const item of list) {
-    const { name, lat, lng, capacity, resources, phone, specialization, color } = item;
+    const { name, lat, lng, location, capacity, resources, phone, specialization, color } = item;
     if (!name || !capacity || !resources) continue;
+
+    let finalLat = parseFloat(lat);
+    let finalLng = parseFloat(lng);
+    if (location && (!finalLat || !finalLng)) {
+      try {
+        const coords = await geocode(location);
+        finalLat = coords[0];
+        finalLng = coords[1];
+      } catch(e) { finalLat = 12.9716; finalLng = 77.5946; }
+    } else if (!finalLat || !finalLng) {
+      finalLat = 12.9716;
+      finalLng = 77.5946;
+    }
+
     const id = `N${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
     const ngo = {
-      id,
-      name,
-      lat:            parseFloat(lat) || 12.9716,
-      lng:            parseFloat(lng) || 77.5946,
+      id, name,
+      lat: finalLat, lng: finalLng,
       capacity:       parseInt(capacity, 10),
       used:           0,
       resources:      Array.isArray(resources) ? resources : resources.split(',').map(r => r.trim()),
@@ -727,8 +762,13 @@ app.post('/api/requests/:id/accept', (req, res) => {
   const assignedData = r.assigned.find(a => a.id === ngoId);
   const count = assignedData ? assignedData.assignedCount : r.people;
 
-  ngo.used = Math.min(ngo.capacity, ngo.used + count);
-  ngo.status = 'busy';
+  // Strict check for capacity
+  if (ngo.capacity - ngo.used < count) {
+    return res.status(400).json({ error: `Insufficient capacity. NGO has ${ngo.capacity - ngo.used} units available, but ${count} are required.` });
+  }
+
+  ngo.used += count;
+  ngo.status = (ngo.used >= ngo.capacity) ? 'busy' : 'busy'; // keep busy for now, but UI will check used/capacity
 
   r.status = 'in-progress';
   r.eta = parseInt(eta, 10) || 5;
@@ -737,7 +777,7 @@ app.post('/api/requests/:id/accept', (req, res) => {
   broadcast('ngoUpdate', ngos);
 
   addComms('to-user', `📱 → User [${r.id}]: Help is on the way! ${ngo.name} dispatched. ETA ~${r.eta} mins.`);
-  addComms('system', `✅ NGO [${ngo.name}] accepted dispatch for ${r.id}`);
+  addComms('system', `✅ NGO [${ngo.name}] accepted dispatch for ${r.id} (${count} people)`);
   
   startTracking(r, assignedData || ngo);
   res.json(r);
