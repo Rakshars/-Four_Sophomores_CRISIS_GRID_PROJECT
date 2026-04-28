@@ -45,8 +45,9 @@ function addComms(type, message) {
   if (commsLog.length > 100) commsLog.pop();
   broadcast('comms', entry);
 }
-
-// ── Geocode Simulation ───────────────────────────────────────────────────────
+// ── Geocoding ────────────────────────────────────────────────────────────────
+// Priority: 1) Direct coords  2) Google Maps API (if key)  3) OpenStreetMap Nominatim (free)
+// Expanded local cache for instant offline demo of major Indian cities
 const AREA_COORDS = {
   koramangala:      [12.9279, 77.6271],
   indiranagar:      [12.9784, 77.6408],
@@ -63,33 +64,36 @@ const AREA_COORDS = {
   malleswaram:      [13.0023, 77.5660],
   bengaluru:        [12.9716, 77.5946],
   bangalore:        [12.9716, 77.5946],
+  mumbai:           [19.0760, 72.8777],
+  delhi:            [28.6139, 77.2090],
+  'new delhi':      [28.6139, 77.2090],
+  chennai:          [13.0827, 80.2707],
+  hyderabad:        [17.3850, 78.4867],
+  pune:             [18.5204, 73.8567],
+  kolkata:          [22.5726, 88.3639],
+  jaipur:           [26.9124, 75.7873],
+  ahmedabad:        [23.0225, 72.5714],
+  lucknow:          [26.8467, 80.9462],
+  kochi:            [9.9312,  76.2673],
+  mangalore:        [12.9141, 74.8560],
+  mysore:           [12.2958, 76.6394],
+  mysuru:           [12.2958, 76.6394],
+  coimbatore:       [11.0168, 76.9558],
+  thiruvananthapuram:[8.5241, 76.9366],
+  vizag:            [17.6868, 83.2185],
+  bhopal:           [23.2599, 77.4126],
+  chandigarh:       [30.7333, 76.7794],
+  goa:              [15.2993, 74.1240],
+  surat:            [21.1702, 72.8311],
+  nagpur:           [21.1458, 79.0882],
+  indore:           [22.7196, 75.8577],
+  patna:            [25.6093, 85.1376],
 };
 
-async function geocode(locStr) {
-  // 1. Check if user provided direct coordinates (e.g. "12.97, 77.59")
-  const coordsMatch = locStr.match(/^(-?\d+(\.\d+)?),\s*(-?\d+(\.\d+)?)$/);
-  if (coordsMatch) {
-    return [parseFloat(coordsMatch[1]), parseFloat(coordsMatch[3])];
-  }
-
-  // 2. Check mock areas for instant demo
-  const lower = locStr.toLowerCase();
-  for (const [k, v] of Object.entries(AREA_COORDS)) {
-    if (lower.includes(k)) return v;
-  }
-
-  // 3. Google Maps Geocoding API
-  return new Promise((resolve) => {
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-    
-    // If no API key is provided, fallback to random mock coordinates
-    if (!apiKey) {
-      console.warn('⚠️ No GOOGLE_MAPS_API_KEY provided. Using random fallback coordinates.');
-      return resolve([12.90 + Math.random() * 0.15, 77.55 + Math.random() * 0.20]);
-    }
-
+// Helper: call Google Maps Geocoding API
+function geocodeGoogle(locStr, apiKey) {
+  return new Promise((resolve, reject) => {
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(locStr)}&key=${apiKey}`;
-    
     https.get(url, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
@@ -98,21 +102,72 @@ async function geocode(locStr) {
           const parsed = JSON.parse(data);
           if (parsed.status === 'OK' && parsed.results && parsed.results.length > 0) {
             const loc = parsed.results[0].geometry.location;
+            console.log(`📍 Google Maps resolved "${locStr}" → [${loc.lat}, ${loc.lng}]`);
             resolve([loc.lat, loc.lng]);
           } else {
-            console.warn('⚠️ Google Maps API failed or returned zero results. Status:', parsed.status);
-            resolve([12.90 + Math.random() * 0.15, 77.55 + Math.random() * 0.20]);
+            reject(new Error(`Google Maps: ${parsed.status}`));
           }
-        } catch (e) {
-          console.error('Error parsing Google Maps response:', e);
-          resolve([12.90 + Math.random() * 0.15, 77.55 + Math.random() * 0.20]);
-        }
+        } catch (e) { reject(e); }
       });
-    }).on('error', (err) => {
-      console.error('Error contacting Google Maps API:', err.message);
-      resolve([12.90 + Math.random() * 0.15, 77.55 + Math.random() * 0.20]);
-    });
+    }).on('error', reject);
   });
+}
+
+// Helper: call OpenStreetMap Nominatim (free, no key needed)
+function geocodeNominatim(locStr) {
+  return new Promise((resolve, reject) => {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(locStr)}&format=json&limit=1`;
+    const options = { headers: { 'User-Agent': 'CrisisGridApp/1.0 (disaster-response-poc)' } };
+    https.get(url, options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed && parsed.length > 0) {
+            const lat = parseFloat(parsed[0].lat);
+            const lng = parseFloat(parsed[0].lon);
+            console.log(`📍 Nominatim resolved "${locStr}" → [${lat}, ${lng}] (${parsed[0].display_name})`);
+            resolve([lat, lng]);
+          } else {
+            reject(new Error('Nominatim: zero results'));
+          }
+        } catch (e) { reject(e); }
+      });
+    }).on('error', reject);
+  });
+}
+
+async function geocode(locStr) {
+  // 1. Direct coordinates (e.g. "12.97, 77.59")
+  const coordsMatch = locStr.match(/^(-?\d+(\.\d+)?),\s*(-?\d+(\.\d+)?)$/);
+  if (coordsMatch) {
+    return [parseFloat(coordsMatch[1]), parseFloat(coordsMatch[3])];
+  }
+
+  // 2. Local cache for instant resolution of known areas
+  const lower = locStr.toLowerCase().trim();
+  for (const [k, v] of Object.entries(AREA_COORDS)) {
+    if (lower.includes(k)) return v;
+  }
+
+  // 3. Try Google Maps API if key is available
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  if (apiKey) {
+    try {
+      return await geocodeGoogle(locStr, apiKey);
+    } catch (e) {
+      console.warn(`⚠️ Google Maps failed for "${locStr}": ${e.message}. Trying Nominatim...`);
+    }
+  }
+
+  // 4. Fallback to OpenStreetMap Nominatim (free, no key required)
+  try {
+    return await geocodeNominatim(locStr);
+  } catch (e) {
+    console.warn(`⚠️ Nominatim also failed for "${locStr}": ${e.message}. Using Bengaluru center.`);
+    return [12.9716, 77.5946]; // Default to Bengaluru center instead of random
+  }
 }
 
 // ── SMS Parser ───────────────────────────────────────────────────────────────

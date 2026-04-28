@@ -106,9 +106,11 @@ export default function DisasterMap({ requests, ngos, tracking, onSelectRequest 
     const m = mapInstance.current;
     if (!m) return;
     const activeIds = new Set();
+    const bounds = [];
     requests.forEach(r => {
       if (r.status === 'completed') return;
       activeIds.add(r.id);
+      bounds.push([r.lat, r.lng]);
       const isHotspot = r.nearbyCount > 1;
       const icon = makeReqIcon(r.priority, r.type, isHotspot);
       const tooltip = `<b>${r.id}</b><br>${r.priority} · ${r.type}<br>${r.people} people<br>Status: ${r.status}${isHotspot ? '<br><b style="color:#ff3030">🚨 URGENT ACTION NEEDED</b>' : ''}`;
@@ -138,6 +140,12 @@ export default function DisasterMap({ requests, ngos, tracking, onSelectRequest 
         }
       }
     });
+    // Auto-fit map to show all active markers
+    if (bounds.length > 0) {
+      const latLngBounds = L.latLngBounds(bounds);
+      ngos.forEach(n => latLngBounds.extend([n.lat, n.lng]));
+      m.fitBounds(latLngBounds.pad(0.15), { maxZoom: 14, animate: true });
+    }
   }, [requests, onSelectRequest]);
 
   useEffect(() => {
