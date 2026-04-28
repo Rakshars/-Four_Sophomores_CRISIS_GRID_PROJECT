@@ -115,6 +115,7 @@ export default function App() {
                           <div style={{ ...styles.ngoMiniBarFill, width: `${pct}%`, background: bc }} />
                         </div>
                         <span style={{ ...styles.ngoMiniCap, color: bc }}>{avail}</span>
+                        <button style={styles.ngoMiniDelBtn} onClick={() => deleteNGO(n.id)}>✕</button>
                       </div>
                     );
                   })}
@@ -233,6 +234,7 @@ const styles = {
   ngoMiniBar: { width: 44, height: 3, background: 'rgba(38,46,68,.4)', borderRadius: 2, overflow: 'hidden', flexShrink: 0 },
   ngoMiniBarFill: { height: '100%', borderRadius: 2, transition: 'width .5s' },
   ngoMiniCap: { fontFamily: 'var(--font-mono)', fontSize: 9, minWidth: 20, textAlign: 'right', fontWeight: 600 },
+  ngoMiniDelBtn: { background: 'transparent', border: 'none', color: '#ff4545', cursor: 'pointer', padding: '0 4px', fontSize: 10, marginLeft: 4, opacity: 0.7, transition: 'opacity .2s' },
 
   // Splash
   splash: { position: 'fixed', inset: 0, background: '#0a0d12', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 },

@@ -471,6 +471,17 @@ app.post('/api/ngos/register', async (req, res) => {
   ngos.push(ngo);
   broadcast('ngoUpdate', ngos);
   addComms('system', `➕ New NGO registered: ${name}`);
+
+  // Re-evaluate pending requests for the newly registered NGO
+  requests.forEach(r => {
+    if (r.status === 'pending') {
+      const alloc = allocateNGOs(r, ngos, r.rejectedBy);
+      if (alloc.length) {
+        triggerAllocation(r, alloc);
+      }
+    }
+  });
+
   res.json({ success: true, ngo });
 });
 

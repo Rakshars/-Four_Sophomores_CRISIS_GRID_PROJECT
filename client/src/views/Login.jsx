@@ -11,8 +11,8 @@ export default function Login() {
   const [error, setError] = useState('');
 
   const [locStr, setLocStr] = useState('');
-  const [cap, setCap] = useState('');
-  const [resources, setResources] = useState('');
+  const [cap, setCap] = useState('100');
+  const [resources, setResources] = useState('medical, food, rescue');
 
   const handleAdminLogin = () => {
     if (password === 'admin') {

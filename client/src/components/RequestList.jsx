@@ -1,5 +1,5 @@
 import React from 'react';
-import { PRIORITY_COLORS, TYPE_COLORS, STATUS_COLORS, formatEta } from '../utils/helpers';
+import { PRIORITY_COLORS, TYPE_COLORS, STATUS_COLORS, formatEta, getArrivalTime, getTrackingStatus } from '../utils/helpers';
 
 export default function RequestList({ requests, tracking, selected, onSelect }) {
   const active = requests.filter(r => r.status !== 'completed');
@@ -47,7 +47,7 @@ function RequestCard({ req, tracking, selected, onClick, dimmed, idx = 0 }) {
   const pc = PRIORITY_COLORS[req.priority] || '#ffd600';
   const tc = TYPE_COLORS[req.type] || '#fff';
   const sc = STATUS_COLORS[req.status] || '#6b7394';
-  const eta = req.eta;
+  const eta = tracking?.eta ?? req.eta;
 
   return (
     <div onClick={onClick} style={{
@@ -78,15 +78,26 @@ function RequestCard({ req, tracking, selected, onClick, dimmed, idx = 0 }) {
 
       {(req.status === 'assigned' || req.status === 'in-progress') && (
         <div style={{ marginTop:8 }}>
-          {tracking && (
-            <div style={styles.progressWrap}>
-              <div style={{ ...styles.progressBar, width:`${(tracking.progress*100).toFixed(1)}%` }} />
+          {tracking ? (
+            <div style={styles.trackerContainer}>
+              <div style={styles.trackerTop}>
+                <span style={styles.trackerStatus}>{getTrackingStatus(eta, tracking.progress)}</span>
+                <span style={styles.trackerTime}>{formatEta(eta)}</span>
+              </div>
+              <div style={styles.trackerBar}>
+                <div style={{ ...styles.trackerFill, width: `${(tracking.progress * 100).toFixed(1)}%` }} />
+                <div style={{ ...styles.trackerDot, left: `calc(${(tracking.progress * 100).toFixed(1)}% - 5px)` }} />
+              </div>
+              <div style={styles.trackerDest}>
+                est. arrival {getArrivalTime(eta)}
+                {req.assigned?.[0] && <span style={{color: '#6b7394'}}> • {req.assigned[0].name}</span>}
+              </div>
+            </div>
+          ) : (
+            <div style={styles.eta}>
+              ETA: {formatEta(eta)} {req.assigned?.[0] && <span style={{color: '#6b7394', fontSize: 9}}> • est. {getArrivalTime(eta)}</span>}
             </div>
           )}
-          <div style={styles.eta}>
-            ETA: {formatEta(eta)}
-            {req.assigned?.[0] && <span style={styles.ngoName}> · {req.assigned[0].name}</span>}
-          </div>
         </div>
       )}
     </div>
@@ -115,4 +126,12 @@ const styles = {
   separator: { fontFamily:"var(--font-mono)", fontSize:9, color:'#6b7394', letterSpacing:1, padding:'10px 4px 6px', display:'flex', alignItems:'center', gap:8 },
   sepLine: { flex:1, height:1, background:'rgba(38,46,68,.5)' },
   empty: { textAlign:'center', color:'#6b7394', fontSize:12, padding:'40px 10px', lineHeight:1.8 },
+  trackerContainer: { background: 'rgba(0,0,0,.2)', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(0,230,118,.15)' },
+  trackerTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  trackerStatus: { fontSize: 10, fontWeight: 600, color: '#00e676', textTransform: 'uppercase', letterSpacing: 0.5 },
+  trackerTime: { fontSize: 12, fontWeight: 700, color: '#fff', fontFamily: "var(--font-mono)" },
+  trackerBar: { height: 4, background: 'rgba(38,46,68,.5)', borderRadius: 4, position: 'relative', marginBottom: 6 },
+  trackerFill: { height: '100%', borderRadius: 4, background: 'linear-gradient(90deg, #00e676, #69f0ae)', transition: 'width 0.5s linear' },
+  trackerDot: { position: 'absolute', top: -3, width: 10, height: 10, background: '#fff', border: '2px solid #00e676', borderRadius: '50%', transition: 'left 0.5s linear', boxShadow: '0 0 8px rgba(0,230,118,.6)' },
+  trackerDest: { fontSize: 9, color: '#9aa0b8', textAlign: 'right', fontFamily: 'var(--font-mono)' },
 };

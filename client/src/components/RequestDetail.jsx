@@ -1,10 +1,10 @@
 import React from 'react';
-import { PRIORITY_COLORS, formatTime, formatEta } from '../utils/helpers';
+import { PRIORITY_COLORS, formatTime, formatEta, getArrivalTime, getTrackingStatus } from '../utils/helpers';
 
 export default function RequestDetail({ req, tracking, onClose }) {
   if (!req) return null;
   const pc = PRIORITY_COLORS[req.priority] || '#ffd600';
-  const eta = req.eta;
+  const eta = tracking?.eta ?? req.eta;
 
   const rows = [
     ['Request ID',      req.id],
@@ -15,7 +15,16 @@ export default function RequestDetail({ req, tracking, onClose }) {
     ['Priority',        <span style={{ color: pc, fontWeight: 700 }}>{req.priority}</span>],
     ['Priority Score',  `${req.score} pts`],
     ['Status',          req.status.toUpperCase()],
-    ['ETA',             formatEta(eta)],
+    ['ETA',             tracking ? (
+      <div style={{ textAlign: 'right', minWidth: 140 }}>
+        <div style={{ color: '#00e676', fontWeight: 'bold', fontSize: 13 }}>{formatEta(eta)}</div>
+        <div style={{ fontSize: 9, color: '#9aa0b8', textTransform: 'uppercase', marginBottom: 4 }}>{getTrackingStatus(eta, tracking.progress)}</div>
+        <div style={{ height: 4, background: 'rgba(38,46,68,.5)', borderRadius: 4, position: 'relative' }}>
+          <div style={{ height: '100%', background: 'linear-gradient(90deg, #00e676, #69f0ae)', borderRadius: 4, width: `${(tracking.progress * 100).toFixed(1)}%` }} />
+        </div>
+        <div style={{ fontSize: 9, color: '#6b7394', marginTop: 2 }}>est. arrival {getArrivalTime(eta)}</div>
+      </div>
+    ) : formatEta(eta)],
     ['Description',     req.description || '—'],
     ['Assigned NGOs',   req.assigned?.length
       ? req.assigned.map(a => `${a.name} (${a.assignedCount} ppl, ${a.dist}km)`).join('\n')

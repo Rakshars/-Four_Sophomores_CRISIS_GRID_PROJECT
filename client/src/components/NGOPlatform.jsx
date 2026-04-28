@@ -12,9 +12,7 @@ const AREA_COORDS = {
 
 const BLANK_NGO = { name: '', location: '', lat: '', lng: '', capacity: '', resources: [], phone: '', specialization: '', color: '#4fc3f7' };
 
-const CSV_TEMPLATE = `name,lat,lng,capacity,resources,phone,specialization,color
-RedRelief Org,12.9716,77.5946,50,"medical,food,rescue",+91-80-0001,Multi-disaster rapid response,#4fc3f7
-HopeAid Foundation,12.9352,77.6245,80,"food,rescue",+91-80-0002,Flood relief & food distribution,#00e676`;
+const CSV_TEMPLATE = `name,lat,lng,capacity,resources,phone,specialization,color`;
 
 export default function NGOPlatform({ ngos, onAdd, onBulkAdd, onUpdate, onDelete }) {
   const [tab,       setTab]    = useState('list'); // 'list' | 'add' | 'bulk'

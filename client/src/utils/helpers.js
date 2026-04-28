@@ -29,6 +29,21 @@ export function formatTime(isoStr) {
 
 export function formatEta(mins) {
   if (mins === null || mins === undefined) return '—';
-  if (mins === 0) return 'ON SITE';
-  return `${mins}m`;
+  if (mins === 0) return 'Arrived';
+  return `${mins} min${mins !== 1 ? 's' : ''}`;
+}
+
+export function getArrivalTime(mins) {
+  if (mins === null || mins === undefined) return '';
+  const arrivalTime = new Date(Date.now() + mins * 60000);
+  return arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+export function getTrackingStatus(mins, progress) {
+  if (mins === null || mins === undefined) return 'Dispatching...';
+  if (mins === 0 || progress >= 1) return 'On Site';
+  if (mins <= 2) return 'Arriving almost immediately';
+  if (mins <= 5) return 'Arriving soon';
+  if (progress > 0.05) return 'On the way';
+  return 'Driver assigned & moving';
 }
