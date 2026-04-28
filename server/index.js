@@ -154,7 +154,7 @@ async function geocode(locStr) {
   // Add region context to help geocoder focus on India/local area if not specified
   let searchStr = locStr;
   if (!/india/i.test(locStr)) {
-    searchStr += ", Karnataka, India";
+    searchStr += ", India";
   }
 
   // 3. Try Google Maps API if key is available

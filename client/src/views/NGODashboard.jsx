@@ -152,22 +152,38 @@ export default function NGODashboard() {
           </div>
 
           <div style={styles.card}>
-            <div style={styles.cardTitle}>RESTOCK RESOURCES</div>
+            <div style={{...styles.cardTitle, display: 'flex', justifyContent: 'space-between'}}>
+              <span>RESTOCK RESOURCES</span>
+              <span style={{fontSize: 9, opacity: 0.7}}>MAX LIMIT: 5000 UNITS</span>
+            </div>
             <div style={{color: '#9aa0b8', fontSize: 12, marginBottom: 15, fontFamily: 'monospace', lineHeight: 1.5}}>
-              Incoming shipment? Update your capacity here to make resources instantly available to the disaster grid.
+              Enter the amount of resources received. Your organization currently manages <strong>{ngoInfo.capacity}</strong> total units. 
+              {ngoInfo.capacity >= 5000 ? (
+                <span style={{color: '#ff4545', display: 'block', marginTop: 5}}>⚠️ Maximum operational capacity reached.</span>
+              ) : (
+                <span style={{display: 'block', marginTop: 5}}>You can add up to <strong>{5000 - ngoInfo.capacity}</strong> more units.</span>
+              )}
             </div>
             <div style={{display: 'flex', gap: 10}}>
               <input 
                 style={styles.input} 
                 type="number" 
                 min="1"
+                max={5000 - ngoInfo.capacity}
                 placeholder="Amount to add..."
+                disabled={ngoInfo.capacity >= 5000}
                 value={addStock || ''} 
                 onChange={e => setAddStock(Number(e.target.value))} 
               />
-              <button style={styles.btn} onClick={handleStockUp}>STOCK UP</button>
+              <button 
+                style={{...styles.btn, opacity: (ngoInfo.capacity >= 5000 || !addStock) ? 0.5 : 1}} 
+                onClick={handleStockUp}
+                disabled={ngoInfo.capacity >= 5000 || !addStock}
+              >
+                STOCK UP
+              </button>
             </div>
-            {statusMsg && <div style={styles.status}>✅ {statusMsg}</div>}
+            {statusMsg && <div style={{...styles.status, color: statusMsg.includes('Success') ? '#00e676' : '#ff4545'}}> {statusMsg}</div>}
           </div>
 
           <div style={{...styles.card, flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column'}}>
